@@ -1,0 +1,82 @@
+services:
+  # ── Piston (primary engine) ──────────────────────────────────────────────
+  piston:
+    image: ghcr.io/engineer-man/piston
+    restart: unless-stopped
+    # Required — piston uses nsjail + cgroups to isolate each job.
+    # Without this, runtimes install but every execution fails.
+    privileged: true
+    ports:
+      - "2000:2000"
+    tmpfs:
+      - /piston/jobs
+    volumes:
+      - piston-packages:/piston/packages
+      # To reuse runtimes already installed elsewhere, swap the line above for a
+      # bind mount to that host path, e.g.:
+      # - /Users/fachalik/Desktop/Project/skyworx/piston/data/piston/packages:/piston/packages
+    environment:
+      PISTON_LOG_LEVEL: warn
+
+      # ── Outbound network for sandboxed code ──────────────────────────────
+      # Default is "true" (blocked): each job gets a network namespace with only
+      # loopback, so DNS fails with EAI_AGAIN and bare IPs give ENETUNREACH.
+      # Set to "false" to let user code reach the internet (fetch, HTTP APIs).
+      #
+      # Piston parses this with `x => x === 'true'`, so any value other than the
+      # exact string "true" disables the block. Compose v2+ coerces an unquoted
+      # YAML boolean to "false" too, but the quotes are kept here because the
+      # older Python compose v1 rejected bare booleans outright.
+      #
+      # This removes the sandbox's network isolation — user code can then reach
+      # anything this host can, including other containers on executor-net.
+      PISTON_DISABLE_NETWORKING: "false"
+
+      # ── Ceilings piston enforces on incoming requests ────────────────────
+      # These are limits, not defaults: a request asking for more is rejected
+      # outright with "run_timeout cannot exceed the configured limit of N".
+      # Stock default is 3000 ms — too short for real HTTP round-trips.
+      PISTON_RUN_TIMEOUT: "15000"
+      PISTON_COMPILE_TIMEOUT: "20000"
+    networks:
+      - executor-net
+
+  # ── Backend API ───────────────────────────────────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    environment:
+      PORT: 3001
+      PISTON_URL: http://piston:2000
+      CORS_ORIGIN: http://localhost:5173
+      # What the backend ASKS piston for. Must stay <= the piston ceilings above,
+      # or piston rejects every request. See backend/src/engines/piston.ts
+      PISTON_RUN_TIMEOUT: "15000"
+      PISTON_COMPILE_TIMEOUT: "20000"
+    depends_on:
+      - piston
+    networks:
+      - executor-net
+
+  # ── Frontend ──────────────────────────────────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend
+    networks:
+      - executor-net
+
+networks:
+  executor-net:
+
+volumes:
+  piston-packages:

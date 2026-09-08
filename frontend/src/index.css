@@ -1,0 +1,51 @@
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Inter:wght@400;500;600&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background:          222 47% 8%;
+    --foreground:          210 40% 92%;
+    --card:                222 47% 10%;
+    --card-foreground:     210 40% 92%;
+    --border:              217 33% 20%;
+    --input:               217 33% 20%;
+    --ring:                239 84% 67%;
+    --primary:             239 84% 67%;
+    --primary-foreground:  0 0% 100%;
+    --secondary:           217 33% 17%;
+    --secondary-foreground: 210 40% 92%;
+    --muted:               217 33% 17%;
+    --muted-foreground:    215 20% 50%;
+    --accent:              239 84% 67%;
+    --accent-foreground:   0 0% 100%;
+    --destructive:         0 63% 55%;
+    --destructive-foreground: 210 40% 98%;
+    --radius:              0.5rem;
+  }
+}
+
+@layer base {
+  * { @apply border-border; }
+  body {
+    @apply bg-background text-foreground;
+    font-family: 'Inter', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  code, pre, .font-mono {
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  }
+}
+
+/* Monaco editor container */
+.monaco-container {
+  border-radius: 0;
+  overflow: hidden;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: hsl(222 47% 8%); }
+::-webkit-scrollbar-thumb { background: hsl(217 33% 25%); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: hsl(217 33% 35%); }
