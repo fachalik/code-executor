@@ -22,4 +22,6 @@ const PORT = Number(process.env.PORT ?? 3001);
 app.listen(PORT, () => {
   console.log(`[backend] listening on :${PORT}`);
   console.log(`[backend] piston  → ${process.env.PISTON_URL ?? 'http://localhost:2000'}`);
+  console.log(`[backend] quickjs → ${process.env.QUICKJS_URL ?? 'http://localhost:3002'}`);
+  console.log(`[backend] isolated-vm → ${process.env.ISOLATEDVM_URL ?? 'http://localhost:3003'}`);
 });

@@ -4,17 +4,6 @@ import type { ExecuteResult, Language } from "../types";
 const PISTON_URL = process.env.PISTON_URL ?? "http://localhost:2000";
 
 /**
- * Piston enforces its own ceilings server-side and rejects the whole request
- * with `"<field> cannot exceed the configured limit of N"` if we ask for more.
- * The stock image caps run/compile timeout at 3000 ms — check yours with:
- *   docker compose exec piston cat /piston_api/src/config.js | grep -A2 timeout
- * Raise the container's limit first, then bump these via env.
- */
-const RUN_TIMEOUT = Number(process.env.PISTON_RUN_TIMEOUT ?? 3_000);
-const COMPILE_TIMEOUT = Number(process.env.PISTON_COMPILE_TIMEOUT ?? 10_000);
-const MEMORY_LIMIT = Number(process.env.PISTON_MEMORY_LIMIT ?? 134_217_728);
-
-/**
  * Language → Piston runtime identifier + pinned version.
  * Run `GET /api/v2/runtimes` against your Piston instance to see
  * the full list after installing runtimes (see README).

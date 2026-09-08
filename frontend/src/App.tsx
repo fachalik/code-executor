@@ -9,31 +9,52 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { useExecutor } from '@/hooks/useExecutor';
-import { LANGUAGE_CONFIG } from '@/types';
-import type { Language } from '@/types';
+import { LANGUAGE_CONFIG, PLATFORM_CONFIG, getDefaultCode } from '@/types';
+import type { Language, Platform } from '@/types';
 
-const LANGUAGES = Object.entries(LANGUAGE_CONFIG) as [Language, typeof LANGUAGE_CONFIG[Language]][];
+const PLATFORMS = Object.entries(PLATFORM_CONFIG) as [Platform, typeof PLATFORM_CONFIG[Platform]][];
+
+const INITIAL_PLATFORM: Platform = 'quickjs';
+const INITIAL_LANGUAGE: Language = 'javascript';
 
 export default function App() {
-  const [language, setLanguage] = useState<Language>('javascript');
-  const [code,     setCode]     = useState(LANGUAGE_CONFIG.javascript.defaultCode);
+  const [platform, setPlatform] = useState<Platform>(INITIAL_PLATFORM);
+  const [language, setLanguage] = useState<Language>(INITIAL_LANGUAGE);
+  const [code,     setCode]     = useState(getDefaultCode(INITIAL_PLATFORM, INITIAL_LANGUAGE));
 
   const { result, loading, error, run, clear } = useExecutor();
 
-  const handleLanguageChange = useCallback((lang: Language) => {
-    setLanguage(lang);
-    setCode(LANGUAGE_CONFIG[lang].defaultCode);
-    clear();
-  }, [clear]);
+  const platformConfig = PLATFORM_CONFIG[platform];
 
-  const handleRun = useCallback(() => {
-    run(code, language);
-  }, [run, code, language]);
-
-  const handleReset = useCallback(() => {
-    setCode(LANGUAGE_CONFIG[language].defaultCode);
+  /**
+   * The two engines do not run the same languages, so switching platform may
+   * strand the current one — Python on QuickJS, TypeScript on Piston. Fall back
+   * to the platform's first language instead of sending a request the backend
+   * will reject.
+   */
+  const handlePlatformChange = useCallback((next: Platform) => {
+    const cfg = PLATFORM_CONFIG[next];
+    const nextLanguage = cfg.languages.includes(language) ? language : cfg.languages[0];
+    setPlatform(next);
+    setLanguage(nextLanguage);
+    setCode(getDefaultCode(next, nextLanguage));
     clear();
   }, [language, clear]);
+
+  const handleLanguageChange = useCallback((lang: Language) => {
+    setLanguage(lang);
+    setCode(getDefaultCode(platform, lang));
+    clear();
+  }, [platform, clear]);
+
+  const handleRun = useCallback(() => {
+    run(code, language, platform);
+  }, [run, code, language, platform]);
+
+  const handleReset = useCallback(() => {
+    setCode(getDefaultCode(platform, language));
+    clear();
+  }, [platform, language, clear]);
 
   return (
     <div className="h-screen flex flex-col bg-background text-foreground overflow-hidden">
@@ -47,29 +68,43 @@ export default function App() {
 
         <Separator orientation="vertical" className="mx-1 h-5" />
 
-        {/* Language selector */}
+        {/* Engine selector */}
+        <div className="flex items-center gap-1.5">
+          <Cpu className="w-3.5 h-3.5 text-muted-foreground" />
+          <Select value={platform} onValueChange={(v) => handlePlatformChange(v as Platform)}>
+            <SelectTrigger className="w-[150px] h-7 text-xs font-mono" title={platformConfig.description}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {PLATFORMS.map(([id, cfg]) => (
+                <SelectItem key={id} value={id} className="text-xs font-mono">
+                  <span className="flex flex-col items-start">
+                    <span>{cfg.label}</span>
+                    <span className="text-[10px] text-muted-foreground">{cfg.description}</span>
+                  </span>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Language selector — options follow the selected engine */}
         <Select value={language} onValueChange={(v) => handleLanguageChange(v as Language)}>
           <SelectTrigger className="w-[140px] h-7 text-xs font-mono">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            {LANGUAGES.map(([lang, cfg]) => (
+            {platformConfig.languages.map((lang) => (
               <SelectItem key={lang} value={lang} className="text-xs font-mono">
-                {cfg.label}
+                {LANGUAGE_CONFIG[lang].label}
               </SelectItem>
             ))}
           </SelectContent>
         </Select>
 
-        {/* Engine */}
-        <div className="flex items-center gap-1.5 text-muted-foreground">
-          <Cpu className="w-3.5 h-3.5" />
-          <span className="font-mono text-xs">piston</span>
-        </div>
-
         <div className="ml-auto flex items-center gap-2">
           <Badge variant="outline" className="text-[10px] font-mono hidden sm:flex">
-            no fetch · no packages
+            {platformConfig.note}
           </Badge>
           <Button
             variant="ghost"
@@ -100,7 +135,7 @@ export default function App() {
           {/* Editor header */}
           <div className="flex items-center gap-2 px-3 py-1.5 border-b border-border/50 flex-shrink-0 bg-card">
             <span className="font-mono text-xs text-muted-foreground">
-              {LANGUAGE_CONFIG[language].label.toLowerCase()} · editor
+              {LANGUAGE_CONFIG[language].label.toLowerCase()} · {platform} · editor
             </span>
             <span className="ml-auto font-mono text-[10px] text-muted-foreground hidden sm:block">
               Ctrl+Enter to run
@@ -109,6 +144,7 @@ export default function App() {
           <CodeEditor
             code={code}
             language={language}
+            platform={platform}
             onChange={setCode}
             onRun={handleRun}
             disabled={loading}

@@ -52,6 +52,8 @@ services:
     environment:
       PORT: 3001
       PISTON_URL: http://piston:2000
+      QUICKJS_URL: http://quickjs:3002
+      ISOLATEDVM_URL: http://isolated-vm:3003
       CORS_ORIGIN: http://localhost:5173
       # What the backend ASKS piston for. Must stay <= the piston ceilings above,
       # or piston rejects every request. See backend/src/engines/piston.ts
@@ -59,8 +61,105 @@ services:
       PISTON_COMPILE_TIMEOUT: "20000"
     depends_on:
       - piston
+      - quickjs
+      - isolated-vm
     networks:
       - executor-net
+      # The only route to the quickjs service, which sits on an internal
+      # network with no gateway of its own.
+      - sandbox-net
+
+  # ── QuickJS executor (WASM sandbox, no container runtime needed) ──────────
+  quickjs:
+    build:
+      context: ./quickjs-code-executor
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      PORT: 3002
+      QUICKJS_TIMEOUT_MS: "5000"
+      QUICKJS_MAX_TIMEOUT_MS: "10000"
+      QUICKJS_MEMORY_BYTES: "67108864"      # 64 MB
+      QUICKJS_MAX_MEMORY_BYTES: "134217728" # 128 MB
+      QUICKJS_MAX_CONCURRENT: "4"
+
+    # Guest code cannot open a socket — `fetch` is stubbed out and there is no
+    # `net`/`http` module to import — so the sandbox needs no egress. Cutting it
+    # off at the container level too turns that from a promise into something an
+    # auditor can check from outside the process.
+    #
+    # sandbox-net is `internal: true`, so it has no gateway and this container
+    # has no route off the host. That only holds while this is its ONLY network:
+    # a second leg on executor-net would hand back the egress this removes.
+    # It also means no published port — reach the service through the backend,
+    # or `docker compose exec quickjs wget -qO- localhost:3002/health`.
+    networks:
+      - sandbox-net
+
+    # Defence in depth around the WASM boundary. The process only needs to read
+    # its own bundle and listen on a port.
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
+    # A CPU-bound script pins one event loop for its whole timeout, so cap what
+    # a saturated executor can take from the host.
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 512M
+
+  # ── isolated-vm executor (real V8 isolate, native addon) ─────────────────
+  isolated-vm:
+    build:
+      context: ./isolated-vm-code-executor
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      PORT: 3003
+      ISOLATEDVM_TIMEOUT_MS: "5000"
+      ISOLATEDVM_MAX_TIMEOUT_MS: "10000"
+      ISOLATEDVM_MEMORY_BYTES: "67108864"      # 64 MB
+      ISOLATEDVM_MAX_MEMORY_BYTES: "134217728" # 128 MB
+      # An isolate evaluates on its own thread rather than on the event loop, so
+      # this can sit higher than the QuickJS service's. The ceiling that matters
+      # is heap: maxConcurrent * maxMemory must fit the container limit below.
+      ISOLATEDVM_MAX_CONCURRENT: "4"
+
+    # Same posture as the quickjs service, for the same reason. A V8 isolate has
+    # no Node bindings at all — no require, no process, no fetch, no timers — so
+    # guest code cannot open a socket. Cutting egress at the container level too
+    # turns that from a promise into something an auditor can check from outside.
+    #
+    # sandbox-net is `internal: true`, so it has no gateway and this container
+    # has no route off the host. That only holds while this is its ONLY network:
+    # a second leg on executor-net would hand back the egress this removes.
+    # It also means no published port — reach the service through the backend, or
+    # `docker compose exec isolated-vm wget -qO- localhost:3003/health`.
+    networks:
+      - sandbox-net
+
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
+    # 4 concurrent isolates at the 128 MB ceiling is 512 MB of guest heap before
+    # the host process's own footprint, so this is deliberately roomier than the
+    # WASM sandbox's limit.
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 1G
 
   # ── Frontend ──────────────────────────────────────────────────────────────
   frontend:
@@ -77,6 +176,9 @@ services:
 
 networks:
   executor-net:
+  # No gateway: containers attached to this network have no route out.
+  sandbox-net:
+    internal: true
 
 volumes:
   piston-packages:
