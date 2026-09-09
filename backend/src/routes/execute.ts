@@ -1,5 +1,6 @@
 import { Request, Response, Router } from "express";
 import { runPiston } from "../engines/piston";
+import { runJudge0, supportsJudge0 } from "../engines/judge0";
 import { runIsolatedVm, supportsIsolatedVm } from "../engines/isolatedvm";
 import { runQuickJs, supportsQuickJs } from "../engines/quickjs";
 import { sanitizeCode } from "../middleware/sanitize";
@@ -8,6 +9,7 @@ import type { ExecuteRequest, Language } from "../types";
 export const executeRouter = Router();
 
 const SUPPORTED_LANGUAGES: Language[] = ["javascript", "python"];
+const JUDGE0_LANGUAGES: Language[] = ["javascript", "typescript", "python"];
 const QUICKJS_LANGUAGES: Language[] = ["javascript", "typescript"];
 const ISOLATEDVM_LANGUAGES: Language[] = ["javascript", "typescript"];
 
@@ -17,6 +19,7 @@ executeRouter.get("/languages", (_req: Request, res: Response) => {
     languages: SUPPORTED_LANGUAGES,
     platforms: {
       piston: SUPPORTED_LANGUAGES,
+      judge0: JUDGE0_LANGUAGES,
       quickjs: QUICKJS_LANGUAGES,
       "isolated-vm": ISOLATEDVM_LANGUAGES,
     },
@@ -87,6 +90,31 @@ executeRouter.post("/execute", async (req: Request, res: Response) => {
         });
       }
 
+      case "judge0": {
+        if (!supportsJudge0(language as Language)) {
+          return res.status(400).json({
+            error: `Judge0 does not support: ${language}`,
+            supported: JUDGE0_LANGUAGES,
+          });
+        }
+        // Same reasoning as piston: Judge0 runs real compilers and interpreters
+        // with real module systems, so the pre-flight regex pass still earns
+        // its place. The isolate boundary underneath is the real defence.
+        const judge0Check = sanitizeCode(code);
+        if (!judge0Check.ok) {
+          return res.status(422).json({
+            error: `Blocked pattern detected: "${judge0Check.blocked}"`,
+            hint: judge0Check.hint,
+            blocked: judge0Check.blocked,
+          });
+        }
+        const result = await runJudge0(code, language as Language);
+        return res.json({
+          ok: result.meta?.status === "success",
+          ...result,
+        });
+      }
+
       case "piston": {
         if (!SUPPORTED_LANGUAGES.includes(language as Language)) {
           return res.status(400).json({
@@ -111,7 +139,7 @@ executeRouter.post("/execute", async (req: Request, res: Response) => {
       default:
         return res.status(400).json({
           error: `Unsupported platform: ${platform}`,
-          supported: ["quickjs", "isolated-vm", "piston"],
+          supported: ["quickjs", "isolated-vm", "piston", "judge0"],
         });
     }
   } catch (err: unknown) {

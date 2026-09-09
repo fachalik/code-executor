@@ -1,6 +1,6 @@
 export type Language = "javascript" | "typescript" | "python";
 
-export type Engine = "piston" | "quickjs" | "isolated-vm";
+export type Engine = "piston" | "judge0" | "quickjs" | "isolated-vm";
 
 export interface ExecuteResult {
   stdout: string;
@@ -30,7 +30,7 @@ export interface ExecuteResult {
 export interface ExecuteRequest {
   code: string;
   language?: Language;
-  platform?: "piston" | "quickjs" | "isolated-vm";
+  platform?: Engine;
   /** Sandbox engines only: exposed to the code as the global `env` object. */
   env?: Record<string, unknown>;
 }
