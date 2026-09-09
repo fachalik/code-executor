@@ -26,6 +26,31 @@ export const config = {
    */
   maxStackSizeBytes: num(process.env.QUICKJS_MAX_STACK_BYTES, 1024 * 1024),
 
+  /**
+   * QuickJS's own `memoryLimit` is a malloc-time check that only fires between
+   * allocations, not before them — under an allocation-storm pattern (many
+   * small objects rather than one big one) it has been measured overshooting
+   * the configured limit by ~3x before it throws, and the WASM heap backing
+   * it never shrinks back. `engine/quickjs.ts` layers a second check onto the
+   * same interrupt callback QuickJS already polls for the CPU timeout, which
+   * preempts a runaway guest much closer to the limit — this is the fraction
+   * of `memoryLimitBytes` at which that watchdog trips.
+   */
+  memoryWatchdogRatio: num(process.env.QUICKJS_MEMORY_WATCHDOG_RATIO, 0.85),
+
+  /**
+   * Absolute backstop on this process's actual RSS, independent of whatever
+   * memoryLimitBytes a request negotiated. Guards the case the two ceilings
+   * above miss: the guest's logical usage is still under its limit but the
+   * WASM heap's real footprint (fragmentation, a previous run's memory not
+   * yet reclaimed) is pushing the container toward its own OOM-kill. Keep
+   * this comfortably under the container memory limit in docker-compose.yml.
+   */
+  hostRssCeilingBytes: num(
+    process.env.QUICKJS_HOST_RSS_CEILING_BYTES,
+    384 * 1024 * 1024
+  ),
+
   // ── Request ceilings ──────────────────────────────────────────────────────
   maxCodeBytes: num(process.env.QUICKJS_MAX_CODE_BYTES, 65_536),
   maxOutputBytes: num(process.env.QUICKJS_MAX_OUTPUT_BYTES, 256 * 1024),

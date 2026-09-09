@@ -15,9 +15,25 @@ const PISTON_LANG: Record<Language, { language: string; version: string }> = {
 };
 
 interface PistonResponse {
-  compile?: { stdout: string; stderr: string; code: number };
+  compile?: { stdout: string; stderr: string; code: number; signal: string | null };
   run: { stdout: string; stderr: string; code: number; signal: string | null };
   message?: string;
+}
+
+type PistonStatus = "success" | "runtime_error" | "syntax_error" | "timeout";
+
+/**
+ * Piston reports failure the same way a shell does: an exit code and/or a
+ * signal, nothing more structured. `run_timeout` in `runPiston` below is what
+ * actually kills a hung script, and it does so with SIGKILL — the same
+ * signal a plain crash could produce, but timeout is by far the more useful
+ * read given this is the one signal Piston's own timeout enforcement sends.
+ */
+function classify(response: PistonResponse): PistonStatus {
+  if (response.compile && response.compile.code !== 0) return "syntax_error";
+  if (response.run.signal === "SIGKILL") return "timeout";
+  if (response.run.code !== 0 || response.run.signal) return "runtime_error";
+  return "success";
 }
 
 export async function runPiston(
@@ -51,15 +67,30 @@ export async function runPiston(
 
   const compileErr = response.compile?.stderr ?? "";
   const runErr = response.run?.stderr ?? "";
+  const status = classify(response);
 
-  return {
+  const result: ExecuteResult = {
     stdout: response.run?.stdout ?? "",
     stderr: compileErr || runErr,
     exitCode: response.run?.code ?? 0,
     signal: response.run?.signal ?? null,
     engine: "piston",
     language,
+    meta: { status },
   };
+
+  if (status !== "success") {
+    result.error = {
+      name: status === "timeout" ? "ExecutionTimeout" : status === "syntax_error" ? "SyntaxError" : "RuntimeError",
+      message:
+        (compileErr || runErr).trim() ||
+        (status === "timeout"
+          ? "Execution exceeded Piston's run_timeout."
+          : `Process exited with code ${response.run?.code ?? "unknown"}.`),
+    };
+  }
+
+  return result;
 }
 
 function getFileName(lang: Language): string {

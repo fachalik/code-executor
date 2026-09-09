@@ -2,9 +2,21 @@
  * Code sanitizer — blocks network access and package imports
  * before the code ever reaches the execution engine.
  *
- * Two layers of defence:
- *  1. Regex scan here (fast, pre-flight)
- *  2. Engine-level: Piston runs via nsjail (network OFF by default)
+ * This is defence-in-depth, NOT the security boundary. A regex scan over
+ * source text cannot be complete — it was bypassed in a security review
+ * (bench/REPORT.md §3.3/3.4) with nothing more exotic than
+ * `globalThis['fet'+'ch']` instead of `fetch(`. Do not add rules here
+ * expecting them to hold against a motivated bypass; add them because they
+ * catch the common, non-adversarial case cheaply (typos, copy-pasted
+ * snippets, accidental package imports) before a container ever spins up.
+ *
+ * The actual boundary is the engine underneath:
+ *  - Piston: nsjail with networking disabled (`PISTON_DISABLE_NETWORKING`
+ *    in docker-compose.yml — this must stay "true").
+ *  - Judge0: the `isolate` sandbox.
+ *  - QuickJS / isolated-vm: don't route through here at all (see
+ *    routes/execute.ts) — their containment is the WASM/V8-isolate boundary
+ *    itself, which a text scanner would only get in the way of.
  */
 
 interface BlockedRule {
@@ -56,6 +68,43 @@ const BLOCKED_RULES: BlockedRule[] = [
     pattern: /\b__non_webpack_require__\b/,
     label: '__non_webpack_require__',
     hint: 'Dynamic require bypass is not allowed.',
+  },
+
+  // ── Python — previously had no coverage at all (bench/REPORT.md §3.3):
+  // `import socket`, `import subprocess`, and `open()` all sailed through.
+  {
+    pattern: /^\s*(import\s+socket\b|from\s+socket\s+import\b)/m,
+    label: 'import socket',
+    hint: 'Network access is disabled.',
+  },
+  {
+    pattern: /^\s*(import\s+subprocess\b|from\s+subprocess\s+import\b)/m,
+    label: 'import subprocess',
+    hint: 'Spawning processes is not allowed.',
+  },
+  {
+    pattern: /\bos\.(system|popen|exec[lv]p?e?|spawn[lv]p?e?)\s*\(/,
+    label: 'os.system / os.exec*',
+    hint: 'Spawning processes is not allowed.',
+  },
+  {
+    pattern: /\b__import__\s*\(\s*['"](socket|subprocess|ctypes)['"]/,
+    label: '__import__(...)',
+    hint: 'Dynamic import of a blocked module is not allowed.',
+  },
+  {
+    pattern: /^\s*import\s+ctypes\b/m,
+    label: 'import ctypes',
+    hint: 'Low-level native access is not allowed.',
+  },
+  {
+    // Python's builtin `open(...)`, not a `.open(...)` method call — this
+    // sanitizer runs over both languages, and `.open(` is common enough in
+    // legitimate JS (e.g. a custom class method) that matching it bare would
+    // be a false-positive magnet for no real gain.
+    pattern: /(?<!\.)\bopen\s*\(/,
+    label: 'open()',
+    hint: 'Filesystem access is disabled.',
   },
 ];
 

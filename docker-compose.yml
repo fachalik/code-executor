@@ -30,7 +30,13 @@ services:
       #
       # This removes the sandbox's network isolation — user code can then reach
       # anything this host can, including other containers on executor-net.
-      PISTON_DISABLE_NETWORKING: "false"
+      #
+      # Keep this "true". It was caught set to "false" in a security review
+      # (bench/REPORT.md §3.4): sandboxed JS *and* Python both reached another
+      # container on the host network through it. The regex sanitizer in
+      # backend/src/middleware/sanitize.ts is a speed bump, not a boundary —
+      # this setting is the actual one.
+      PISTON_DISABLE_NETWORKING: "true"
 
       # ── Ceilings piston enforces on incoming requests ────────────────────
       # These are limits, not defaults: a request asking for more is rejected

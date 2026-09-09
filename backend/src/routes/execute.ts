@@ -133,7 +133,10 @@ executeRouter.post("/execute", async (req: Request, res: Response) => {
           });
         }
         const result = await runPiston(code, language as Language);
-        return res.json({ ok: true, ...result });
+        return res.json({
+          ok: result.meta?.status === "success",
+          ...result,
+        });
       }
 
       default:

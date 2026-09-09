@@ -50,13 +50,22 @@ docker compose exec isolated-vm wget -qO- localhost:3003/health
 
 ### Install language runtimes into Piston
 
-Piston ships empty — install runtimes after first boot:
+Piston ships empty — install runtimes after first boot. This image has no `ppman`
+binary; runtimes install through the HTTP API instead — see what's available with
+`curl -s http://localhost:2000/api/v2/packages | jq .`, then install by
+`{language, version}` (JavaScript is the **`node`** package, not `javascript`):
 
 ```bash
-docker compose exec piston ppman install javascript
-docker compose exec piston ppman install python
-docker compose exec piston ppman install typescript
+curl -s -X POST http://localhost:2000/api/v2/packages -H 'Content-Type: application/json' \
+  -d '{"language":"node","version":"20.11.1"}'
+curl -s -X POST http://localhost:2000/api/v2/packages -H 'Content-Type: application/json' \
+  -d '{"language":"python","version":"3.12.0"}'
+curl -s -X POST http://localhost:2000/api/v2/packages -H 'Content-Type: application/json' \
+  -d '{"language":"typescript","version":"5.0.3"}'
 ```
+
+Installed packages live on the `piston-packages` named volume, so they survive a
+container recreate — this only needs to run once per volume, not once per boot.
 
 Verify what's installed (this is the config the backend targets):
 
@@ -94,6 +103,19 @@ curl -s http://localhost:2358/about | jq .
 
 The backend reaches it at `JUDGE0_URL` (default `http://localhost:2358`; the
 compose file points the container at `http://host.docker.internal:2358`).
+
+**Lock it down.** A security review (`bench/REPORT.md` §3.5) found a real Judge0
+deployment on this host reachable on `0.0.0.0:2358` with authentication disabled —
+open to anything else on the network, not just this backend. Judge0's own compose
+stack is outside this repo, so it can't be fixed here, but two settings in *its*
+`docker-compose.yml` matter:
+- Set `ENABLE_WAIT_RESULT`/auth env vars per the
+  [Judge0 configuration docs](https://ce.judge0.com/configuration/) and set
+  `AUTHN_HEADER`/`AUTHZ_HEADER` so it rejects unauthenticated requests — then set
+  the matching `JUDGE0_AUTH_TOKEN`/`JUDGE0_AUTH_USER` here (see the commented-out
+  lines in `docker-compose.yml`); this backend already sends them when set.
+- Bind its port to loopback (`127.0.0.1:2358:2358` instead of `2358:2358`) unless
+  something outside this host genuinely needs to reach it directly.
 
 Judge0's language ids are **per-deployment**, not a stable part of the API.
 Confirm them before trusting the map in
