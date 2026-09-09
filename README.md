@@ -2,16 +2,18 @@
 
 Sandboxed code execution playground.
 
-**Stack:** React + Monaco Editor + shadcn/ui · Express + TypeScript · three
+**Stack:** React + Monaco Editor + shadcn/ui · Express + TypeScript · four
 interchangeable execution engines
 
 | Engine | Isolation | Languages | Use it for |
 |--------|-----------|-----------|------------|
 | **Piston** | nsjail container, real interpreters | JavaScript, Python | Anything needing a full runtime. |
+| **Judge0** | `isolate` sandbox, real compilers | JavaScript, TypeScript, Python | The same, when you want per-run CPU time and peak memory metered by the kernel. |
 | **QuickJS** | QuickJS-WASM, in-process, no JIT | JavaScript, TypeScript | Untrusted rules and transforms where the audit story matters more than raw speed. |
 | **isolated-vm** | A real V8 isolate per request, JIT on | JavaScript, TypeScript | The same untrusted rules, when they are hot enough that interpreter speed hurts. |
 
-The two sandboxes share one contract — input on the global `env`, output as
+Piston and Judge0 both run a plain script and give you back its stdout. The two
+sandboxes share a different contract — input on the global `env`, output as
 `export default` — so the same snippet runs on either. They differ only in what
 enforces the boundary and how fast it goes.
 
@@ -32,6 +34,7 @@ docker compose up --build
 | Frontend | http://localhost:5173 |
 | Backend  | http://localhost:3001 |
 | Piston   | http://localhost:2000 |
+| Judge0   | http://localhost:2358 — see below, runs as its own stack |
 | QuickJS  | internal only — see below |
 | isolated-vm | internal only — see below |
 
@@ -75,6 +78,62 @@ curl -s http://localhost:2000/api/v2/runtimes | jq .
 The versions in [backend/src/engines/piston.ts](backend/src/engines/piston.ts) are pinned to
 match. If you install different versions, update `PISTON_LANG` there.
 
+### Run Judge0 alongside
+
+Judge0 ships its own compose stack (server, workers, postgres, redis) and is
+**not** managed by this project's `docker-compose.yml`. Bring it up separately
+from a [Judge0 CE release](https://github.com/judge0/judge0/releases):
+
+```bash
+cd judge0-v1.13.1
+docker compose up -d db redis
+sleep 10                      # let postgres finish its first-boot init
+docker compose up -d
+curl -s http://localhost:2358/about | jq .
+```
+
+The backend reaches it at `JUDGE0_URL` (default `http://localhost:2358`; the
+compose file points the container at `http://host.docker.internal:2358`).
+
+Judge0's language ids are **per-deployment**, not a stable part of the API.
+Confirm them before trusting the map in
+[backend/src/engines/judge0.ts](backend/src/engines/judge0.ts):
+
+```bash
+curl -s http://localhost:2358/languages | jq '.[] | select(.name | test("Node|TypeScript|Python 3"))'
+```
+
+```json
+{ "id": 63, "name": "JavaScript (Node.js 12.14.0)" }
+{ "id": 74, "name": "TypeScript (3.7.4)" }
+{ "id": 71, "name": "Python (3.8.1)" }
+```
+
+These are old runtimes — Node 12 has no `?.` or `??`, and Python 3.8 has no
+`match`. The starter code in the playground stays inside what they support.
+
+The limits the backend asks for must sit under Judge0's own ceilings, which you
+can read off `curl -s http://localhost:2358/config_info | jq .` — a submission
+above `max_cpu_time_limit`, `max_wall_time_limit` or `max_memory_limit` is
+rejected outright.
+
+> **cgroup v2 hosts (incl. Docker Desktop on macOS).** Judge0 1.13.1 bundles
+> `isolate` 1.8.1, which only speaks cgroup **v1**. On a unified-hierarchy host
+> the API answers fine but every submission comes back
+> `status: Internal Error` with
+> `No such file or directory @ rb_sysopen - /box/script.*`. Confirm with:
+>
+> ```bash
+> docker exec <judge0-workers> sh -lc 'isolate --cg -b 0 --cleanup; isolate --cg -b 0 --init'
+> # Failed to create control group /sys/fs/cgroup/memory/box-0/: No such file or directory
+> ```
+>
+> The controllers cannot be mounted from inside the container either — the fix
+> is on the host: boot the docker VM with `systemd.unified_cgroup_hierarchy=0`,
+> or run Judge0 on a cgroup v1 Linux host. The engine here handles this
+> cleanly, surfacing Judge0's own message as `stderr` rather than a silent
+> empty result.
+
 ---
 
 ## Local development
@@ -94,6 +153,7 @@ npm run dev   # :3003
 cd backend
 npm install
 PISTON_URL=http://localhost:2000 \
+JUDGE0_URL=http://localhost:2358 \
 QUICKJS_URL=http://localhost:3002 \
 ISOLATEDVM_URL=http://localhost:3003 \
 npm run dev   # :3001
@@ -108,7 +168,7 @@ npm run dev   # :5173 — proxies /api → :3001
 
 ## Security model
 
-The three engines defend themselves differently, so they are gated differently.
+The four engines defend themselves differently, so they are gated differently.
 
 ### Piston
 
@@ -119,6 +179,17 @@ The three engines defend themselves differently, so they are gated differently.
 
 > `require()` for built-in Node modules (`path`, `os`, `crypto`, etc.) is allowed —
 > the sanitizer only blocks third-party package imports (patterns without `./` or `/`).
+
+### Judge0
+
+Gated exactly like Piston, and for the same reason: real compilers, real module
+systems, so the regex pre-flight still earns its place.
+
+| Layer | Mechanism |
+|-------|-----------|
+| **Backend sanitizer** | The same regex pre-flight as Piston |
+| **Judge0 runtime** | `isolate` — per-submission chroot, cgroup CPU/memory caps, networking off (`enable_network: false`) |
+| **Metering** | The kernel reports CPU time and peak RSS per run; both come back in `meta` |
 
 ### QuickJS
 
@@ -170,6 +241,7 @@ the full comparison.
 ```
 code-executor/
 ├── docker-compose.yml          # Piston + QuickJS + isolated-vm + backend + frontend
+│                               # (Judge0 runs as its own separate stack)
 ├── backend/
 │   ├── src/
 │   │   ├── index.ts
@@ -177,10 +249,11 @@ code-executor/
 │   │   ├── routes/execute.ts   # POST /api/execute — picks the engine
 │   │   ├── engines/
 │   │   │   ├── piston.ts
+│   │   │   ├── judge0.ts       # HTTP client for an external Judge0 CE
 │   │   │   ├── quickjs.ts      # HTTP client for the executor service
 │   │   │   └── isolatedvm.ts   # HTTP client for the executor service
 │   │   └── middleware/
-│   │       └── sanitize.ts     # pre-flight checks (Piston only)
+│   │       └── sanitize.ts     # pre-flight checks (Piston + Judge0)
 │   └── Dockerfile
 ├── quickjs-code-executor/      # standalone QuickJS-WASM service
 │   ├── src/
@@ -237,7 +310,7 @@ code-executor/
 }
 ```
 
-**Response (blocked — Piston only)**
+**Response (blocked — Piston and Judge0 only)**
 ```json
 {
   "error":   "Blocked pattern detected: \"fetch()\"",
@@ -245,6 +318,49 @@ code-executor/
   "blocked": "fetch()"
 }
 ```
+
+#### `platform: "judge0"`
+
+Same request shape as Piston — no `env`, no `result`. What it adds is `meta`:
+
+```json
+{
+  "ok":       true,
+  "stdout":   "hello\n",
+  "stderr":   "",
+  "exitCode": 0,
+  "signal":   null,
+  "engine":   "judge0",
+  "language": "python",
+  "meta":     { "status": "success", "timeMs": 43, "memoryKb": 8192 }
+}
+```
+
+`timeMs` is kernel-measured CPU time and `memoryKb` is peak RSS, so unlike
+Piston this engine can tell you what a run actually cost.
+
+Judge0's status ids are folded into the same `meta.status` vocabulary the
+sandboxes use — Accepted → `success`, Compilation Error → `syntax_error`, Time
+Limit Exceeded → `timeout`, the SIGSEGV/SIGABRT/NZEC family → `runtime_error`,
+Internal Error → `internal_error`. A failed run answers `200` with `ok: false`,
+an `error` object naming Judge0's own status, and `stderr` carrying the compile
+output or traceback:
+
+```json
+{
+  "ok":       false,
+  "stdout":   "",
+  "stderr":   "main.ts(2,7): error TS2322: Type 'string' is not assignable to type 'number'.",
+  "exitCode": 1,
+  "signal":   null,
+  "engine":   "judge0",
+  "language": "typescript",
+  "meta":     { "status": "syntax_error" },
+  "error":    { "name": "Compilation Error", "message": "main.ts(2,7): error TS2322: ..." }
+}
+```
+
+Output over 64 KB is clipped, with `meta.truncated: true`.
 
 #### `platform: "quickjs"` and `platform: "isolated-vm"`
 
@@ -290,6 +406,7 @@ Code that throws, times out or exhausts memory still answers `200` with
   "languages": ["javascript", "python"],
   "platforms": {
     "piston":      ["javascript", "python"],
+    "judge0":      ["javascript", "typescript", "python"],
     "quickjs":     ["javascript", "typescript"],
     "isolated-vm": ["javascript", "typescript"]
   }
@@ -297,5 +414,6 @@ Code that throws, times out or exhausts memory still answers `200` with
 ```
 
 Piston: `javascript` (Node 20.11.1) · `python` (3.12.0).
+Judge0: `javascript` (Node 12.14.0) · `typescript` (3.7.4) · `python` (3.8.1).
 QuickJS and isolated-vm: `javascript` · `typescript` (transpiled, types erased
 not checked).

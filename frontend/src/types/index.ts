@@ -1,10 +1,13 @@
 export type Language = "javascript" | "typescript" | "python";
 
-export type Platform = "piston" | "quickjs" | "isolated-vm";
+export type Platform = "piston" | "judge0" | "quickjs" | "isolated-vm";
 
 export type Engine = Platform;
 
-/** Mirrors the sandbox services' `meta.status`. Piston does not report one. */
+/**
+ * Mirrors the sandbox services' `meta.status`, which Judge0 also maps onto.
+ * Piston does not report one.
+ */
 export type ExecuteStatus =
   | "success"
   | "runtime_error"
@@ -114,6 +117,94 @@ print(f"Pi ≈ {pi:.6f}")
 # Dictionary comprehension
 squares = {n: n**2 for n in range(1, 11)}
 print("Squares:", squares)
+`,
+    },
+  },
+
+  judge0: {
+    label: "Judge0",
+    description: "isolate sandbox · real compilers · metered",
+    note: "no fetch · no packages",
+    languages: ["javascript", "typescript", "python"],
+    defaultCode: {
+      javascript: `// Judge0 — Node.js 12.14.0 inside an \`isolate\` sandbox.
+// Judge0 meters every run: the status bar above shows the CPU time and peak
+// RSS the kernel actually charged this process, not a wall-clock guess.
+//
+// Node 12 predates ?. and ??, so keep the syntax conservative here.
+
+var numbers = [];
+for (var i = 1; i <= 10; i++) numbers.push(i);
+
+var sumOfEvenSquares = numbers
+  .filter(function (n) { return n % 2 === 0; })
+  .map(function (n) { return n * n; })
+  .reduce(function (acc, n) { return acc + n; }, 0);
+
+console.log('Even numbers squared, sum:', sumOfEvenSquares);
+
+// Something with a measurable cost, so the time/memory badges have work to
+// report on.
+var sieve = new Uint8Array(200000);
+var primes = 0;
+for (var n = 2; n < sieve.length; n++) {
+  if (sieve[n]) continue;
+  primes++;
+  for (var m = n * n; m < sieve.length; m += n) sieve[m] = 1;
+}
+console.log('Primes below', sieve.length + ':', primes);
+
+console.error('stderr is captured separately');
+`,
+      typescript: `// Judge0 — TypeScript 3.7.4, compiled with tsc and then run on Node.
+// Unlike the two sandboxes, this is a real compile step: a type error is a
+// Compilation Error, and the compiler output lands in the stderr pane.
+
+interface Applicant {
+  name:   string;
+  income: number;
+  debt:   number;
+  age:    number;
+}
+
+const applicants: Applicant[] = [
+  { name: 'Alice', income: 95000, debt: 12000, age: 34 },
+  { name: 'Bob',   income: 48000, debt: 31000, age: 22 },
+];
+
+function score(a: Applicant): number {
+  let s = 500;
+  s += a.income / 1000;
+  s -= a.debt / 500;
+  if (a.age > 25) s += 20;
+  return Math.round(s);
+}
+
+for (const a of applicants) {
+  const total = score(a);
+  const tier = total > 550 ? 'A' : total > 500 ? 'B' : 'C';
+  console.log(a.name + ' → ' + total + ' (tier ' + tier + ')');
+}
+`,
+      python: `# Judge0 — Python 3.8.1 inside an \`isolate\` sandbox.
+# Note the version: 3.8 has the walrus operator but not match/case,
+# and not the 3.9+ dict merge operator.
+import sys
+from math import isqrt, pi
+
+numbers = list(range(1, 21))
+evens  = [n for n in numbers if n % 2 == 0]
+primes = [n for n in numbers if n > 1 and all(n % i for i in range(2, isqrt(n) + 1))]
+
+print("Evens: ", evens)
+print("Primes:", primes)
+print(f"Pi ≈ {pi:.6f}")
+
+# Peak memory shows up in the status bar — give it something to measure.
+squares = {n: n ** 2 for n in range(1, 200_000)}
+print("Largest square:", squares[max(squares)])
+
+print("stderr is captured separately", file=sys.stderr)
 `,
     },
   },

@@ -17,7 +17,8 @@ interface Props {
  * Both sandbox engines hand input to the guest on a global `env` and take the
  * module's default export as the result. Without a declaration Monaco flags
  * every use of `env` as an undefined name, which reads as a bug in the starter
- * code. Piston has no such global, so the lib is registered per engine.
+ * code. Piston and Judge0 run a plain script and have no such global, so the
+ * lib is registered per engine.
  */
 const SANDBOX_GLOBALS = `
 /** Input passed to this execution by the caller. */
@@ -26,7 +27,7 @@ declare const env: Record<string, any>;
 
 const SANDBOX_LIB = 'ts:sandbox-globals.d.ts';
 
-/** The engines that expose `env`. Piston runs a plain script and does not. */
+/** The engines that expose `env`. Piston and Judge0 run a script and do not. */
 const SANDBOX_PLATFORMS: Platform[] = ['quickjs', 'isolated-vm'];
 
 export function CodeEditor({ code, language, platform, onChange, onRun, disabled }: Props) {

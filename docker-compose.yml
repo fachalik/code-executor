@@ -52,6 +52,23 @@ services:
     environment:
       PORT: 3001
       PISTON_URL: http://piston:2000
+
+      # ── Judge0 ───────────────────────────────────────────────────────────
+      # Judge0 ships its own compose stack (server + workers + postgres +
+      # redis) and is not managed here, so the backend reaches it across the
+      # host rather than over a shared docker network. Point this at
+      # `http://judge0-server:2358` instead if you move it onto executor-net.
+      JUDGE0_URL: http://host.docker.internal:2358
+      # Limits the backend asks Judge0 for. Judge0 rejects anything above its
+      # own max_cpu_time_limit / max_wall_time_limit / max_memory_limit —
+      # check them with `curl -s localhost:2358/config_info`.
+      JUDGE0_CPU_TIME_LIMIT: "5"     # seconds
+      JUDGE0_WALL_TIME_LIMIT: "10"   # seconds
+      JUDGE0_MEMORY_LIMIT_KB: "128000"
+      # Set both only if your Judge0 has authn/authz enabled.
+      # JUDGE0_AUTH_TOKEN: ""
+      # JUDGE0_AUTH_USER: ""
+
       QUICKJS_URL: http://quickjs:3002
       ISOLATEDVM_URL: http://isolated-vm:3003
       CORS_ORIGIN: http://localhost:5173
@@ -59,6 +76,10 @@ services:
       # or piston rejects every request. See backend/src/engines/piston.ts
       PISTON_RUN_TIMEOUT: "15000"
       PISTON_COMPILE_TIMEOUT: "20000"
+    # Judge0 lives outside this compose project, so host.docker.internal above
+    # needs an explicit mapping on Linux (Docker Desktop provides it already).
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       - piston
       - quickjs
