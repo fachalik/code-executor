@@ -1,0 +1,24 @@
+{
+  "engine": "isolated-vm",
+  "direct": false,
+  "workload": "payload",
+  "vus": 10,
+  "duration": "20s",
+  "iterations": 26659,
+  "rps": 1332.5991797400518,
+  "http_fail_rate": 0,
+  "exec_ok_rate": 1,
+  "shed_429": null,
+  "lat_ms": {
+    "avg": 7.346557686859965,
+    "p50": 7.117833,
+    "p90": 8.327275,
+    "p95": 9.104637799999997,
+    "p99": null,
+    "max": 33.13775
+  },
+  "engine_time_ms": {
+    "avg": 2.9352563862110355,
+    "p95": 4
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "engine": "piston",
+  "direct": false,
+  "workload": "cpu",
+  "vus": 10,
+  "duration": "20s",
+  "iterations": 263,
+  "rps": 12.856156336599494,
+  "http_fail_rate": 0,
+  "exec_ok_rate": 1,
+  "shed_429": null,
+  "lat_ms": {
+    "avg": 770.9701806235743,
+    "p50": 713.162709,
+    "p90": 1031.2554588,
+    "p95": 1124.7994880999997,
+    "p99": null,
+    "max": 1274.319709
+  },
+  "engine_time_ms": {
+    "avg": null,
+    "p95": null
+  }
+}

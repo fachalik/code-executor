@@ -1,0 +1,299 @@
+[
+  {
+    "engine": "piston",
+    "name": "hello js",
+    "req": {
+      "code": "console.log('hi')",
+      "language": "javascript",
+      "platform": "piston"
+    },
+    "pass": true,
+    "status": 200,
+    "snapshot": {
+      "ok": true,
+      "stdout": "hi\n",
+      "stderr": ""
+    }
+  },
+  {
+    "engine": "piston",
+    "name": "arithmetic py",
+    "req": {
+      "code": "print(6*7)",
+      "language": "python",
+      "platform": "piston"
+    },
+    "pass": true,
+    "status": 200,
+    "snapshot": {
+      "ok": true,
+      "stdout": "42\n",
+      "stderr": ""
+    }
+  },
+  {
+    "engine": "piston",
+    "name": "runtime error surfaces",
+    "req": {
+      "code": "throw new Error(\"boom\")",
+      "language": "javascript",
+      "platform": "piston"
+    },
+    "pass": true,
+    "status": 200,
+    "snapshot": {
+      "ok": true,
+      "stdout": "",
+      "stderr": "/box/submission/main.js:1\nthrow new Error(\"boom\")\n^\n\nError: "
+    }
+  },
+  {
+    "engine": "judge0",
+    "name": "hello js",
+    "req": {
+      "code": "console.log('hi')",
+      "language": "javascript",
+      "platform": "judge0"
+    },
+    "pass": false,
+    "status": 200,
+    "snapshot": {
+      "ok": false,
+      "status": "internal_error",
+      "stdout": "",
+      "stderr": "No such file or directory @ rb_sysopen - /box/script.js"
+    }
+  },
+  {
+    "engine": "judge0",
+    "name": "arithmetic py",
+    "req": {
+      "code": "print(6*7)",
+      "language": "python",
+      "platform": "judge0"
+    },
+    "pass": false,
+    "status": 200,
+    "snapshot": {
+      "ok": false,
+      "status": "internal_error",
+      "stdout": "",
+      "stderr": "No such file or directory @ rb_sysopen - /box/script.py"
+    }
+  },
+  {
+    "engine": "judge0",
+    "name": "runtime error surfaces",
+    "req": {
+      "code": "throw new Error(\"boom\")",
+      "language": "javascript",
+      "platform": "judge0"
+    },
+    "pass": true,
+    "status": 200,
+    "snapshot": {
+      "ok": false,
+      "status": "internal_error",
+      "stdout": "",
+      "stderr": "No such file or directory @ rb_sysopen - /box/script.js"
+    }
+  },
+  {
+    "engine": "quickjs",
+    "name": "env->result",
+    "req": {
+      "code": "const {a,b}=env; export default {sum:a+b}",
+      "language": "javascript",
+      "platform": "quickjs",
+      "env": {
+        "a": 20,
+        "b": 22
+      }
+    },
+    "pass": true,
+    "status": 200,
+    "snapshot": {
+      "ok": true,
+      "status": "success",
+      "stdout": "",
+      "result": {
+        "sum": 42
+      },
+      "stderr": ""
+    }
+  },
+  {
+    "engine": "quickjs",
+    "name": "console captured",
+    "req": {
+      "code": "console.log('side'); export default 1",
+      "language": "javascript",
+      "platform": "quickjs",
+      "env": {}
+    },
+    "pass": true,
+    "status": 200,
+    "snapshot": {
+      "ok": true,
+      "status": "success",
+      "stdout": "side\n",
+      "result": 1,
+      "stderr": ""
+    }
+  },
+  {
+    "engine": "quickjs",
+    "name": "typescript erased",
+    "req": {
+      "code": "const x:number=21; export default x*2",
+      "language": "typescript",
+      "platform": "quickjs",
+      "env": {}
+    },
+    "pass": true,
+    "status": 200,
+    "snapshot": {
+      "ok": true,
+      "status": "success",
+      "stdout": "",
+      "result": 42,
+      "stderr": ""
+    }
+  },
+  {
+    "engine": "quickjs",
+    "name": "throw -> ok:false runtime_error",
+    "req": {
+      "code": "throw new Error(\"boom\")",
+      "language": "javascript",
+      "platform": "quickjs",
+      "env": {}
+    },
+    "pass": true,
+    "status": 200,
+    "snapshot": {
+      "ok": false,
+      "status": "runtime_error",
+      "stdout": "",
+      "stderr": ""
+    }
+  },
+  {
+    "engine": "quickjs",
+    "name": "meta metering present",
+    "req": {
+      "code": "export default 1",
+      "language": "javascript",
+      "platform": "quickjs",
+      "env": {}
+    },
+    "pass": true,
+    "status": 200,
+    "snapshot": {
+      "ok": true,
+      "status": "success",
+      "stdout": "",
+      "result": 1,
+      "stderr": ""
+    }
+  },
+  {
+    "engine": "isolated-vm",
+    "name": "env->result",
+    "req": {
+      "code": "const {a,b}=env; export default {sum:a+b}",
+      "language": "javascript",
+      "platform": "isolated-vm",
+      "env": {
+        "a": 20,
+        "b": 22
+      }
+    },
+    "pass": true,
+    "status": 200,
+    "snapshot": {
+      "ok": true,
+      "status": "success",
+      "stdout": "",
+      "result": {
+        "sum": 42
+      },
+      "stderr": ""
+    }
+  },
+  {
+    "engine": "isolated-vm",
+    "name": "console captured",
+    "req": {
+      "code": "console.log('side'); export default 1",
+      "language": "javascript",
+      "platform": "isolated-vm",
+      "env": {}
+    },
+    "pass": true,
+    "status": 200,
+    "snapshot": {
+      "ok": true,
+      "status": "success",
+      "stdout": "side\n",
+      "result": 1,
+      "stderr": ""
+    }
+  },
+  {
+    "engine": "isolated-vm",
+    "name": "typescript erased",
+    "req": {
+      "code": "const x:number=21; export default x*2",
+      "language": "typescript",
+      "platform": "isolated-vm",
+      "env": {}
+    },
+    "pass": true,
+    "status": 200,
+    "snapshot": {
+      "ok": true,
+      "status": "success",
+      "stdout": "",
+      "result": 42,
+      "stderr": ""
+    }
+  },
+  {
+    "engine": "isolated-vm",
+    "name": "throw -> ok:false runtime_error",
+    "req": {
+      "code": "throw new Error(\"boom\")",
+      "language": "javascript",
+      "platform": "isolated-vm",
+      "env": {}
+    },
+    "pass": true,
+    "status": 200,
+    "snapshot": {
+      "ok": false,
+      "status": "runtime_error",
+      "stdout": "",
+      "stderr": ""
+    }
+  },
+  {
+    "engine": "isolated-vm",
+    "name": "meta metering present",
+    "req": {
+      "code": "export default 1",
+      "language": "javascript",
+      "platform": "isolated-vm",
+      "env": {}
+    },
+    "pass": true,
+    "status": 200,
+    "snapshot": {
+      "ok": true,
+      "status": "success",
+      "stdout": "",
+      "result": 1,
+      "stderr": ""
+    }
+  }
+]

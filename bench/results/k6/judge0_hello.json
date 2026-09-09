@@ -1,0 +1,24 @@
+{
+  "engine": "judge0",
+  "direct": false,
+  "workload": "hello",
+  "vus": 5,
+  "duration": "10s",
+  "iterations": 50,
+  "rps": 4.843783616539455,
+  "http_fail_rate": 0,
+  "exec_ok_rate": 0,
+  "shed_429": null,
+  "lat_ms": {
+    "avg": 1024.6567538400002,
+    "p50": 995.335459,
+    "p90": 1076.3365964000002,
+    "p95": 1310.6215837,
+    "p99": null,
+    "max": 1340.451625
+  },
+  "engine_time_ms": {
+    "avg": null,
+    "p95": null
+  }
+}

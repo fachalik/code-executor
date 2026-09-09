@@ -1,0 +1,24 @@
+{
+  "engine": "quickjs",
+  "direct": false,
+  "workload": "hello",
+  "vus": 10,
+  "duration": "20s",
+  "iterations": 2304,
+  "rps": 114.61828786137194,
+  "http_fail_rate": 0,
+  "exec_ok_rate": 1,
+  "shed_429": null,
+  "lat_ms": {
+    "avg": 87.01820751171886,
+    "p50": 85.65145799999999,
+    "p90": 105.8569831,
+    "p95": 132.63780799999998,
+    "p99": null,
+    "max": 272.042667
+  },
+  "engine_time_ms": {
+    "avg": 34.83289930555556,
+    "p95": 62
+  }
+}

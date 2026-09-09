@@ -16,7 +16,7 @@ services:
       # bind mount to that host path, e.g.:
       # - /Users/fachalik/Desktop/Project/skyworx/piston/data/piston/packages:/piston/packages
     environment:
-      PISTON_LOG_LEVEL: warn
+      PISTON_LOG_LEVEL: INFO
 
       # ── Outbound network for sandboxed code ──────────────────────────────
       # Default is "true" (blocked): each job gets a network namespace with only
