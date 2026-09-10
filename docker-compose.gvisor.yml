@@ -1,0 +1,4 @@
+# docker-compose.gvisor.yml
+services:
+  quickjs:     { runtime: runsc }
+  isolated-vm: { runtime: runsc }

@@ -1,0 +1,116 @@
+{
+  "phase": "04-gvisor",
+  "when": "2026-09-10T07:43:05.999Z",
+  "summary": {
+    "pass": 18,
+    "fail": 0,
+    "skip": 0
+  },
+  "checks": [
+    {
+      "status": "pass",
+      "name": "runsc registered with docker",
+      "detail": ""
+    },
+    {
+      "status": "pass",
+      "name": "quickjs runtime = runsc",
+      "detail": ""
+    },
+    {
+      "status": "pass",
+      "name": "isolated-vm runtime = runsc",
+      "detail": ""
+    },
+    {
+      "status": "pass",
+      "name": "backend still on runc",
+      "detail": ""
+    },
+    {
+      "status": "pass",
+      "name": "piston still on runc",
+      "detail": ""
+    },
+    {
+      "status": "pass",
+      "name": "frontend still on runc",
+      "detail": ""
+    },
+    {
+      "status": "pass",
+      "name": "runsc: /proc/version is a gVisor sentry",
+      "detail": ""
+    },
+    {
+      "status": "pass",
+      "name": "kernel symbol leak (/proc/kallsyms) closed by gVisor",
+      "detail": "runc:'ALLOWED (symbols readable)' -> runsc:'denied/empty'"
+    },
+    {
+      "status": "pass",
+      "name": "kernel memory image (/proc/kcore) closed by gVisor",
+      "detail": "runc:'ALLOWED' -> runsc:'denied/absent'"
+    },
+    {
+      "status": "pass",
+      "name": "/sys/kernel/uevent_helper write closed by gVisor",
+      "detail": "runc:'ALLOWED' -> runsc:'denied/absent'"
+    },
+    {
+      "status": "pass",
+      "name": "quickjs: syscalls hit the gVisor sentry",
+      "detail": "uid=1000(node) gid=1000(node) groups=1000(node)"
+    },
+    {
+      "status": "pass",
+      "name": "quickjs: /proc/kcore denied",
+      "detail": ""
+    },
+    {
+      "status": "pass",
+      "name": "isolated-vm: syscalls hit the gVisor sentry",
+      "detail": "uid=1000(node) gid=1000(node) groups=1000(node)"
+    },
+    {
+      "status": "pass",
+      "name": "isolated-vm: /proc/kcore denied",
+      "detail": ""
+    },
+    {
+      "status": "pass",
+      "name": "io_uring_setup refused by gVisor",
+      "detail": "unconfined host: ALLOWED"
+    },
+    {
+      "status": "info",
+      "name": "userfaultfd",
+      "detail": "host kernel refused it even unconfined ('       denied: Operation not permitted')"
+    },
+    {
+      "status": "info",
+      "name": "perf_event_open",
+      "detail": "host kernel refused it even unconfined ('   denied: Permission denied')"
+    },
+    {
+      "status": "info",
+      "name": "bpf",
+      "detail": "host kernel refused it even unconfined ('               denied: Operation not permitted')"
+    },
+    {
+      "status": "pass",
+      "name": "no new sandbox leaks under gVisor",
+      "detail": "27/27 contained, 0 LEAK lines"
+    },
+    {
+      "status": "pass",
+      "name": "quickjs executes under gVisor",
+      "detail": ""
+    },
+    {
+      "status": "pass",
+      "name": "isolated-vm executes under gVisor",
+      "detail": ""
+    }
+  ]
+}
